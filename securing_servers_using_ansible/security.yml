@@ -1,0 +1,120 @@
+---
+- hosts: all
+  gather_facts: no
+  become: yes
+  become_user: root
+  remote_user: root
+  vars:
+    env: dev
+    ansible_python_interpreter: /usr/bin/python3
+  vars_files:
+    - config.yml    
+    - secrets.yml
+  tasks:
+    - name: Update APT packages cache
+      apt: update_cache={{ update_apt_cache }} cache_valid_time=86400
+
+    - name: Perform aptitude dist-upgrade
+      apt: upgrade=dist
+
+    - name: Add user
+      user: name="{{ server_user }}" shell="{{ shell }}" password="{{ server_user_password }}"
+
+    - name: Install sudo
+      apt: name=sudo update_cache={{ update_apt_cache }} state=present cache_valid_time=86400
+
+    - name: Add user to sudoers
+      lineinfile: dest=/etc/sudoers
+                  regexp="{{ server_user }} ALL"
+                  line="{{ server_user }} ALL=(ALL) ALL"
+                  state=present
+
+    - name: Limit su access to sudo group
+      command: dpkg-statoverride --update --add root sudo 4750 /bin/su
+      register: limit_su_res
+      failed_when: limit_su_res.rc != 0 and ("already exists" not in limit_su_res.stderr)
+      changed_when: limit_su_res.rc == 0
+
+    - name: Disallow root SSH access
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^PermitRootLogin"
+                  line="PermitRootLogin no"
+                  state=present
+      notify: restart ssh
+
+    - name: Delete root password
+      action: shell passwd -d root
+      changed_when: False
+
+    - name: Add authorized_keys for the user
+      authorized_key: user={{ server_user }} key="{{ lookup('file', item) }}"
+      with_items:
+        - "{{ user_public_keys }}"
+
+    - name: Disallow password authentication
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^PasswordAuthentication"
+                  line="PasswordAuthentication no"
+                  state=present
+      notify: restart ssh
+
+    - name: Allow ssh only for primary user
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^AllowUsers"
+                  line="AllowUsers {{ server_user }}"
+                  state=present
+      notify: restart ssh
+
+    - name: Install Unattended Upgrades
+      apt: update_cache={{ update_apt_cache }} state=installed pkg=unattended-upgrades
+
+    - name: Set up unattended upgrades
+      copy:
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::AutocleanInterval "7";
+          APT::Periodic::Unattended-Upgrade "1";
+        dest: /etc/apt/apt.conf.d/10periodic
+
+    - name: Automatically remove unused dependencies
+      lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades
+                  regexp="Unattended-Upgrade::Remove-Unused-Dependencies"
+                  line="Unattended-Upgrade::Remove-Unused-Dependencies \"true\";"
+                  state=present
+                  create=yes
+
+    - name: Install Uncomplicated Firewall
+      apt: update_cache={{ update_apt_cache }} state=installed pkg=ufw
+      when: enable_ufw is defined and enable_ufw
+
+    - name: add user to docker group
+      user: name="{{ server_user }}" groups=docker append=yes
+  
+      # Allow only ssh and http(s) ports
+    - name: Allow ssh and http(s) connections
+      ufw: rule=allow port={{ item }}
+      with_items:
+        - "{{ ufw_allowed_ports }}"
+      when: enable_ufw is defined and enable_ufw
+
+    - name: Enable ufw/firewall
+      ufw: state=enabled policy=deny
+      when: enable_ufw is defined and enable_ufw
+
+    - name: Install fail2ban
+      apt: update_cache={{ update_apt_cache }} state=installed pkg=fail2ban
+      when: enable_fail2ban is defined and enable_fail2ban
+
+    - name: Set up fail2ban
+      command: cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+              creates=/etc/fail2ban/jail.local
+      notify: restart fail2ban
+      when: enable_fail2ban is defined and enable_fail2ban
+
+  handlers:
+    - name: restart ssh
+      service: name=ssh state=restarted
+
+    - name: restart fail2ban
+      service: name=fail2ban state=restarted

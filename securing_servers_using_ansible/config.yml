@@ -1,0 +1,11 @@
+# security stuff
+update_apt_cache: yes
+user_public_keys:
+  - ~/.ssh/key.pub
+enable_ufw: yes
+enable_fail2ban: yes
+ufw_allowed_ports:
+  - 22
+  - 80
+  - 443
+shell: "/bin/bash"

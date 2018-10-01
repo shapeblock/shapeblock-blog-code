@@ -1,0 +1,13 @@
+version: "2"
+
+services:
+  mariadb:
+    image: mariadb:10.3
+
+  php:
+    build:
+      context: .
+      dockerfile: ./deploy/php/Dockerfile
+
+  nginx:
+    image: nginx:alpine
