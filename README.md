@@ -6,6 +6,7 @@ This repository holds all the code associated with the posts at [lakshminp.com](
 
 | Post                                                                                                 |                                                |
 |------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| [Using Drupal and Docker in production](https://www.lakshminp.com/using-drupal-and-docker-in-production)                                                                  | [code](https://github.com/badri/lakshminp.com/tree/master/using_drupal_docker_in_production)                                           |
 | [Local setup for Drupal using Docker](https://www.lakshminp.com/local-drupal-development-using-docker)                                                                  | [code](https://github.com/badri/lakshminp.com/tree/master/local_setup_for_drupal_using_docker)                                           |
 | [Securing your servers using Ansible](https://www.lakshminp.com/securing-your-servers-using-ansible) | [code](https://github.com/badri/lakshminp.com/tree/master/securing_servers_using_ansible) |
 | [Booting a mongoDB container with user specified credentials](https://www.lakshminp.com/docker-mongodb) | [code](https://github.com/badri/lakshminp.com/tree/master/mongodb_container_with_user_specified_credentials) |
