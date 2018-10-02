@@ -1,0 +1,62 @@
+version: "2"
+
+services:
+  mariadb:
+    extends:
+      file: docker-compose.yml
+      service: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - /mariadb-init2/${ENV}:/docker-entrypoint-initdb.d
+      - /mariadb-data2/${ENV}:/var/lib/mysql
+    networks:
+      - internal
+    labels:
+      - traefik.enable=false
+
+  php:
+    extends:
+      file: docker-compose.yml
+      service: php
+    volumes:
+      - ./:/code
+      - /db-backup:/db-backup
+    environment:
+      PHP_SENDMAIL_PATH: /usr/sbin/sendmail -t -i -S mailhog:1025
+      PHP_FPM_CLEAR_ENV: "no"
+      DB_HOST: mariadb
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_DRIVER: mysql
+    networks:
+      - internal
+    labels:
+      - traefik.enable=false
+
+  nginx:
+    extends:
+      file: docker-compose.yml
+      service: nginx
+    volumes:
+      - ./:/code
+      - ./deploy/nginx/config/default:/etc/nginx/conf.d/default.conf
+      - ./deploy/nginx/config/drupal:/etc/nginx/include/drupal
+    labels:
+      - traefik.backend=${ENV}
+      - traefik.frontend.rule=Host:${DOMAIN}
+      - traefik.docker.network=proxy
+      - traefik.port=80
+    networks:
+      - internal
+      - proxy
+
+networks:
+  proxy:
+    external: true
+  internal:
+    external: false
