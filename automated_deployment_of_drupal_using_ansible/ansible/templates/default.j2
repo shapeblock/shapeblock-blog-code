@@ -1,0 +1,15 @@
+server {
+  server_name {{ domain_name }};
+  root /code/web;
+  index index.php;
+
+  {% if env == "prod" %}
+  if ( $host !~ ^www\. ) {
+    return 301 $scheme://www.$host$request_uri;
+  }  
+  {% endif %}
+  error_log  /var/log/nginx/error.log;
+  access_log /var/log/nginx/access.log;
+
+  include include/drupal;
+}

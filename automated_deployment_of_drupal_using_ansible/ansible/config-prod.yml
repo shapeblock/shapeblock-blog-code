@@ -1,0 +1,10 @@
+---
+# project related stuff
+project_path: '/webapps/prod'
+
+# git info
+git_repo: 'git@gitlab.com:yourname/your-repo.git'
+git_branch: 'master'
+
+# domain stuff
+domain_name: "example.com"

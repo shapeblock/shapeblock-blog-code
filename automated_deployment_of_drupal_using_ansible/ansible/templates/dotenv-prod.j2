@@ -1,0 +1,10 @@
+MYSQL_ROOT_PASSWORD={{ vault_mysql_root_password }}
+MYSQL_DATABASE={{ vault_mysql_database }}
+MYSQL_USER={{ vault_mysql_user }}
+MYSQL_PASSWORD={{ vault_mysql_password }}
+{% if env == "prod" %}
+DOMAIN=www.{{ domain_name }},{{ domain_name }}
+{% else %}
+DOMAIN={{ domain_name }}
+{% endif %}
+ENV={{ env }}

@@ -1,0 +1,234 @@
+---
+- hosts: all
+  gather_facts: yes
+  become_user: root
+  become: yes
+  remote_user: "{{ server_user }}"
+  vars:
+    env: dev
+  vars_files:
+    - config.yml    
+    - "config-{{ env }}.yml"
+    - secrets-common.yml
+    - "secrets-{{ env }}.yml"
+  tasks:
+    - name: Create DB backup directory
+      file:
+        path: "{{ db_backup_directory }}"
+        state: directory
+        owner: "{{ server_user }}"
+      tags:
+        - setup
+
+    - name: Create DB persistence directory
+      file:
+        path: "{{ db_persistence_directory }}"
+        state: directory
+        owner: "{{ server_user }}"
+      tags:
+        - setup
+
+    - name: Create DB init directory
+      file:
+        path: "{{ db_init_directory }}"
+        state: directory
+        owner: "{{ server_user }}"
+      tags:
+        - setup
+
+    - name: Create Files backup directory
+      file:
+        path: "{{ files_backup_directory }}"
+        state: directory
+        owner: "{{ server_user }}"
+      tags:
+        - setup
+
+    - name: Backup database
+      shell: |
+        docker-compose -f {{ compose_file }} run php ./vendor/bin/drush --root=/code/web sql-dump --result-file=/db-backup/db-{{ ansible_date_time.date }}.sql --gzip
+      args:
+        chdir: "{{ project_path }}"
+      tags: deploy
+      when: env == "prod"
+
+    - name: Backup files
+      archive:
+        path:
+          - "{{ project_path }}/web/sites/default/files/*"
+          - "{{ project_path }}/web/sites/default/files/.*"
+        dest: "{{ files_backup_directory }}/files-{{ ansible_date_time.date }}.tar.gz"
+      tags: deploy
+      when: env == "prod"
+
+    - name: Create project directory
+      file:
+        path: "{{ project_path }}"
+        state: directory
+        owner: "{{ server_user }}"
+      tags:
+        - deploy
+        - setup
+
+    - name: Ensure .ssh directory exists.
+      file: 
+        dest: "{{ vault_key_file | dirname }}"
+        mode: 0700
+        owner: deploy
+        state: directory
+      tags: always
+
+    - name: Install ssh key
+      copy: 
+        content: "{{ vault_ssh_key }}" 
+        dest: "{{ vault_key_file }}"
+        mode: 0600
+        owner: "{{ server_user }}"
+      notify: Delete ssh key
+      tags: always
+
+    - name: Setup the Git repo
+      git:
+        repo: "{{ git_repo }}"
+        version: "{{ git_branch }}"
+        dest: "{{ project_path }}"
+        accept_hostkey: yes
+        depth: 1
+        force: yes
+      become_user: "{{ server_user }}"
+      tags:
+        - deploy
+        - setup
+
+    - name: Create .env file
+      template: 
+        src: "templates/dotenv-{{ env }}.j2"
+        dest: "{{ project_path }}/.env"
+        owner: deploy
+      tags:
+        - deploy
+        - setup
+
+    - name: Create nginx config
+      template: 
+        src: "templates/default.j2"
+        dest: "{{ project_path }}/deploy/nginx/config/default"
+        owner: deploy
+      tags:
+        - deploy
+        - setup
+
+    - name: Get DB from remote
+      get_url:
+        url: "{{ db_dump_url }}"
+        dest: "{{ db_init_directory }}/db.sql.gz"
+      tags:
+        - setup
+
+    - name: Remove DB file
+      file:
+        path: "{{ db_init_directory }}/db.sql"
+        state: absent
+      tags:
+        - setup
+
+    - name: Extract DB
+      shell: |
+       gzip -d {{ db_init_directory }}/db.sql.gz
+      tags:
+        - setup
+
+    - name: Create files dir
+      file:
+        path: "{{ project_path }}/web/sites/default/files"
+        state: directory
+      tags:
+        - setup
+        - tags
+      
+    - name: Restore files from archive
+      unarchive:
+        src: "{{ files_dump_url }}"
+        dest: "{{ project_path }}/web/sites/default/files"
+        mode: a+w
+        remote_src: yes
+      tags:
+        - setup
+      
+    - name: Build latest containers
+      shell: |
+        docker-compose -f {{ compose_file }} build
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - deploy
+        - setup
+
+    - name: Remove existing containers
+      shell: |
+        docker-compose -f {{ compose_file }} down
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - deploy
+
+    - name: Update robots.txt to disallow search engines for non prod site
+      template: 
+        src: "templates/robots.txt.j2"
+        dest: "{{ project_path }}/web/robots.txt"
+        owner: deploy
+      tags:
+        - deploy
+        - setup
+      when: env != "prod"
+
+    - name: Boot latest containers
+      shell: |
+        docker-compose -f {{ compose_file }} up -d
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - deploy
+        - setup
+
+    - name: Run composer
+      shell: |
+        docker-compose -f {{ compose_file }} run php composer install
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - setup
+        - deploy
+    
+    - name: Run DB updates
+      shell: |
+        docker-compose -f {{ compose_file }} run php ./vendor/bin/drush --root=/code/web updb -y
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - deploy
+        - setup
+
+    - name: Import config from files
+      shell: |
+        docker-compose -f {{ compose_file }} run php ./vendor/bin/drush --root=/code/web cim -y
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - deploy
+        - setup
+
+    - name: Clear cache
+      shell: |
+        docker-compose -f {{ compose_file }} run php ./vendor/bin/drush --root=/code/web cr
+      args:
+        chdir: "{{ project_path }}"
+      tags:
+        - deploy
+        - setup
+
+  handlers:
+    - name: Delete ssh key
+      file: 
+        dest: "{{ vault_key_file }}"
+        state: absent

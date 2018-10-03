@@ -88,8 +88,8 @@
       apt: update_cache={{ update_apt_cache }} state=installed pkg=ufw
       when: enable_ufw is defined and enable_ufw
 
-    - name: add user to docker group
-      user: name="{{ server_user }}" groups=docker append=yes
+    # - name: add user to docker group
+    #   user: name="{{ server_user }}" groups=docker append=yes
   
       # Allow only ssh and http(s) ports
     - name: Allow ssh and http(s) connections

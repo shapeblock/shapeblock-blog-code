@@ -1,0 +1,21 @@
+# security stuff
+update_apt_cache: yes
+user_public_keys:
+  - ~/.ssh/lnp.pub
+enable_ufw: yes
+enable_fail2ban: yes
+ufw_allowed_ports:
+  - 22
+  - 80
+  - 443
+shell: "/bin/bash"
+
+compose_file: production.yml
+
+
+# DB and file volumes
+db_persistence_directory: "/mariadb-data2/{{ env }}"
+db_init_directory: "/mariadb-init2/{{ env }}"
+db_backup_directory: "/db-backup"
+files_backup_directory: "/drupal-files"
+ansible_become_pass: "{{ server_user_password_plaintext }}"
