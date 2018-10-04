@@ -1,0 +1,53 @@
+version: "2"
+
+services:
+  mariadb:
+    extends:
+      file: docker-compose.yml
+      service: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./mariadb-init:/docker-entrypoint-initdb.d # Place init .sql file(s) here.
+      - ./mariadb-data:/var/lib/mysql
+
+  php:
+    extends:
+      file: docker-compose.yml
+      service: php
+    volumes:
+      - ./:/code
+    environment:
+      PHP_SENDMAIL_PATH: /usr/sbin/sendmail -t -i -S mailhog:1025
+      PHP_FPM_CLEAR_ENV: "no"
+      DB_HOST: mariadb
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_DRIVER: mysql
+      NON_PROD: 1
+
+  nginx:
+    extends:
+      file: docker-compose.yml
+      service: nginx
+    volumes:
+      - ./:/code
+      - ./deploy/nginx/config/local:/etc/nginx/conf.d/default.conf
+      - ./deploy/nginx/config/drupal:/etc/nginx/include/drupal
+    ports:
+      - '8000:80'
+
+  pma:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_HOST: mariadb
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      PHP_UPLOAD_MAX_FILESIZE: 1G
+      PHP_MAX_INPUT_VARS: 1G
+    ports:
+      - '9000:80'

@@ -1,0 +1,26 @@
+version: '2'
+
+services:
+  traefik:
+    image: traefik
+    restart: always
+    command: --docker
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - $PWD/traefik.toml:/traefik.toml
+      - $PWD/acme.json:/acme.json
+    container_name: traefik
+    environment:
+      DO_AUTH_TOKEN: abcxyz123
+    labels:
+      - traefik.frontend.rule=Host:monitor.example.com
+      - traefik.port=8080
+
+networks:
+  proxy:
+    external: true

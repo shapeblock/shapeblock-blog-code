@@ -1,0 +1,48 @@
+image: docker:edge-git
+
+services:
+  - docker:dind
+
+variables:
+  DEV_HOST: staging.example.com
+  PROD_HOST: www.example.com
+
+
+stages:
+  - deploy
+
+do_dev_deploy:
+  stage: deploy
+  image: python:3.6
+  only:
+    - develop
+  script:
+    - pip install ansible
+    # install ssh-agent
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    # run ssh-agent
+    - mkdir -p ~/.ssh
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$SSH_PRIVATE_KEY")
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    # deploy
+    - ansible-playbook -i "$DEV_HOST," -u root ansible/playbook.yml --tags deploy --vault-password-file=./ansible/vault-env
+  when: always
+
+do_prod_deploy:
+  stage: deploy
+  image: python:3.6
+  only:
+    - master
+  script:
+    - pip install ansible
+    # install ssh-agent
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    # run ssh-agent
+    - mkdir -p ~/.ssh
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$SSH_PRIVATE_KEY")
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    # deploy
+    - ansible-playbook -i "$PROD_HOST," -u root ansible/playbook.yml --tags deploy --vault-password-file=./ansible/vault-env --extra-vars "env=prod"
+  when: always
