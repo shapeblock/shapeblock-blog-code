@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Route
+metadata:
+  name: apache-route
+  labels:
+    app: demo1  
+spec:
+  host: apache-2.apps.dev.lakshminp.cloud
+  to:
+    kind: Service
+    name: apache-service
