@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: apache-rs2
+  labels:
+    app: demo2
+spec:
+  replicas: 2
+  selector: 
+    matchLabels: 
+      app: demo2
+    matchExpressions: 
+      - {key: app, operator: In, values: [demo2]}
+  template:
+    metadata:
+      labels:
+        app: demo2
+    spec:
+      containers:
+      - name: webserver
+        image: lakshminp/apache:v2
+        ports:
+        - name: http
+          containerPort: 8080
+      restartPolicy: Always
