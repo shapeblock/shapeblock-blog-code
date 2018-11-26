@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  generateName: apache-
+  name: apache-2
   labels:
     app: demo1
 spec:
