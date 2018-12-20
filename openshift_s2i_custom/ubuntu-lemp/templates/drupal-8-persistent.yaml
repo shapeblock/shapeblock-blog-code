@@ -1,0 +1,342 @@
+apiVersion: v1
+kind: Template
+message: |-
+  The following service(s) have been created in your project: ${NAME}, ${MYSQL_SERVICE_NAME}.
+
+  For more information about using this template, including OpenShift considerations, see https://github.com/badri/ubuntu-drupal-8-s2i/blob/master/README.md.
+metadata:
+  annotations:
+    description: An example PHP 7.1 application running on Ubuntu with a MySQL database, built for Drupal 8. For more information
+      about using this template, including OpenShift considerations, see https://github.com/badri/ubuntu-drupal-8-s2i/blob/master/README.md..
+    iconClass: icon-drupal
+    openshift.io/display-name: Drupal 8
+    openshift.io/documentation-url: https://github.com/badri/ubuntu-drupal-8-s2i
+    openshift.io/long-description: This template defines resources needed to develop
+      an Ubuntu based Drupal context running on PHP 7.1 application with a MySQL DB, including a build configuration, application deployment configuration, and database deployment configuration.
+    openshift.io/provider-display-name: Lakshmi Narasimhan
+    openshift.io/support-url: https://www.lakshminp.com
+    tags: quickstart,php,drupal
+    template.openshift.io/bindable: "false"
+  name: drupal-8
+objects:
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: "${NAME}"
+  stringData:
+    database-user: "${MYSQL_USER}"
+    database-password: "${MYSQL_PASSWORD}"
+    database-root-password: "${MYSQL_ROOT_PASSWORD}"
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftNewApp
+    name: ${NAME}
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${NAME}:latest
+    source:
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: openshift-drupal:v13
+          namespace: ${NAMESPACE}
+      type: Source
+    triggers:
+    - type: ImageChange
+    - type: ConfigChange
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftNewApp
+    name: ${NAME}
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftNewApp
+    name: ${NAME}
+  spec:
+    replicas: 1
+    selector:
+      name: ${NAME}
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          openshift.io/generated-by: OpenShiftNewApp
+        labels:
+          name: ${NAME}
+      spec:
+        containers:
+        - env:
+          - name: MYSQL_HOST
+            value: "${MYSQL_SERVICE_NAME}"
+          - name: MYSQL_PORT
+            value: "3306"
+          - name: MYSQL_DATABASE
+            value: "${MYSQL_DATABASE}"
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: "${NAME}"
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: "${NAME}"
+          image: ' '
+          imagePullPolicy: Always
+          name: env-clear
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          resources:
+            limits:
+              memory: ${MEMORY_LIMIT}
+          volumeMounts:
+          - mountPath: /opt/app-root/src/web/sites/default/files
+            name: ${NAME}-files
+        volumes:
+        - name: ${NAME}-files
+          persistentVolumeClaim:
+            claimName: ${NAME}-files
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - env-clear
+        from:
+          kind: ImageStreamTag
+          name: ${NAME}:latest
+      type: ImageChange
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      template.alpha.openshift.io/wait-for-ready: "true"
+    name: ${MYSQL_SERVICE_NAME}
+  spec:
+    replicas: 1
+    selector:
+      name: ${MYSQL_SERVICE_NAME}
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          name: ${MYSQL_SERVICE_NAME}
+      spec:
+        containers:
+        - env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: "${NAME}"
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: "${NAME}"
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-root-password
+                name: "${NAME}"
+          - name: MYSQL_DATABASE
+            value: "${MYSQL_DATABASE}"
+          image: ' '
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 3306
+            timeoutSeconds: 1
+          name: mysql
+          ports:
+          - containerPort: 3306
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -i
+              - -c
+              - MYSQL_PWD="$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u $MYSQL_USER -D $MYSQL_DATABASE
+                -e 'SELECT 1'
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: ${MEMORY_MYSQL_LIMIT}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/lib/mysql/data
+            name: ${MYSQL_SERVICE_NAME}-data
+        volumes:
+        - name: ${MYSQL_SERVICE_NAME}-data
+          persistentVolumeClaim:
+            claimName: ${MYSQL_SERVICE_NAME}
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - mysql
+        from:
+          kind: ImageStreamTag
+          name: mysql:5.7
+          namespace: ${NAMESPACE}
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: Route
+  metadata:
+    annotations:
+      openshift.io/host.generated: "true"
+    name: ${NAME}
+  spec:
+    host: ${APPLICATION_DOMAIN}
+    to:
+      kind: Service
+      name: ${NAME}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/dependencies: '[{"name": "${MYSQL_SERVICE_NAME}",
+        "kind": "Service"}]'
+    name: ${NAME}
+  spec:
+    ports:
+    - name: web
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      name: ${NAME}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+    name: ${MYSQL_SERVICE_NAME}
+  spec:
+    ports:
+    - name: mysql
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+    selector:
+      name: ${MYSQL_SERVICE_NAME}
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${MYSQL_SERVICE_NAME}
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${NAME}-files
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${FILES_VOLUME_CAPACITY}
+parameters:
+- description: The name assigned to all of the frontend objects defined in this template.
+  displayName: Name
+  name: NAME
+  required: true
+  value: drupal-8
+- description: The OpenShift Namespace where the ImageStream resides.
+  displayName: Namespace
+  name: NAMESPACE
+  required: true
+  value: openshift
+- description: Maximum amount of memory the Ubuntu LEMP container can use.
+  displayName: Memory Limit
+  name: MEMORY_LIMIT
+  required: true
+  value: 512Mi
+- description: Maximum amount of memory the MySQL container can use.
+  displayName: Memory Limit (MySQL)
+  name: MEMORY_MYSQL_LIMIT
+  required: true
+  value: 512Mi
+- description: Volume space available for data, e.g. 512Mi, 2Gi
+  displayName: Volume Capacity
+  name: VOLUME_CAPACITY
+  required: true
+  value: 1Gi
+- description: Volume space available for sites/default/files, e.g. 512Mi, 2Gi
+  displayName: Files Volume Capacity
+  name: FILES_VOLUME_CAPACITY
+  required: true
+  value: 1Gi
+- description: The URL of the repository with your application source code.
+  displayName: Git Repository URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/badri/drupal-8-composer
+- description: Set this to a branch name, tag or other ref of your repository if you
+    are not using the default branch.
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+- description: The exposed hostname that will route to the LEMP service, if left
+    blank a value will be defaulted.
+  displayName: Application Hostname
+  name: APPLICATION_DOMAIN
+- description: Github trigger secret.  A difficult to guess string encoded as part
+    of the webhook URL.  Not encrypted.
+  displayName: GitHub Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+- displayName: Database Service Name
+  name: MYSQL_SERVICE_NAME
+  required: true
+  value: mysql
+- displayName: Database Name
+  name: MYSQL_DATABASE
+  required: true
+  value: drupal8
+- displayName: Database User
+  name: MYSQL_USER
+  required: true
+  value: drupal8
+- name: MYSQL_ROOT_PASSWORD
+  displayName: MySQL root user Password
+  description: Password for the MySQL root user.
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+- displayName: Database Password
+  from: '[a-zA-Z0-9]{16}'
+  generate: expression
+  name: MYSQL_PASSWORD
