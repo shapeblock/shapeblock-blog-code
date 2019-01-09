@@ -27,13 +27,13 @@ $ oc import-image lakshminp/php-s2i-centos --confirm
 ### Create a new app
 
 ```
-$ oc new-app php-s2i-centos~https://github.com/sclorg/cakephp-ex.git -e CAKEPHP_SECRET_TOKEN=94A22HZy6QNDlIjsjgJklc7vB2W0qRujPwbH2RS4 -e CAKEPHP_SECURITY_SALT=kGluK3k5OfuE6CUSDjmnsBpNvfv1OwSMWx4t9u9N --name=cakephp-app-1
+$ oc new-app php-s2i-centos~https://github.com/sclorg/cakephp-ex.git --name=cakephp-app
 ```
 
 ### Confirm logs
 
 ```
-$ oc logs -f bc/cakephp-app-1
+$ oc logs -f bc/cakephp-app
 Cloning "https://github.com/sclorg/cakephp-ex.git" ...
 	Commit:	c1b7cdc5ff9bc1f04ef3a3bda896d9b1456e0204 (Merge pull request #107 from liangxia/url)
 	Author:	Honza Horak <hhorak@redhat.com>
@@ -48,5 +48,27 @@ Using lakshminp/php-s2i-centos@sha256:27ac622026511e79847f7b99f80fbbe315ee43affd
 ### Build image
 
 ```
-$ docker build -t lemp-s2i-ubuntu .
+$ docker build -t lakshminp/ubuntu-lemp-s2i .
+```
+
+### Test image
+
+```
+$ s2i build test/test-app lakshminp/ubuntu-lemp-s2i test-ubuntu-lemp-s2i
+```
+
+```
+$ docker run -d -p 8080:8080 test-ubuntu-lemp-s2i
+```
+
+### Try in OpenShift
+
+```
+$ oc import-image lakshminp/ubuntu-lemp-s2i --confirm
+```
+
+### Run symfony demo application
+
+```
+$ s2i build ~/demo lakshminp/ubuntu-lemp-s2i test-ubuntu-lemp-s2i -e APP_ENV=prod -e APP_SECRET=67d829bf61dc5f87a73fd814e2c9f629 -e DATABASE_URL=sqlite:///%kernel.project_dir%/data/database.sqlite
 ```

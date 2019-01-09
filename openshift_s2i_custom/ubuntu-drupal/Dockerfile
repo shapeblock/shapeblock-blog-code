@@ -8,14 +8,13 @@ ENV UBUNTU_RELEASE=xenial \
     LC_ALL=en_US.UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     ACCEPT_EULA=y \
-    HOME=/opt/app-root/src \
-    S2I_SCRIPTS_PATH=/usr/libexec/s2i
+    HOME=/opt/app-root/src
 
-LABEL io.k8s.description="Base image for Ubuntu based LEMP" \
-      io.k8s.display-name="OpenShift LEMP" \
+LABEL io.k8s.description="Base image for Ubuntu based Drupal 8" \
+      io.k8s.display-name="OpenShift Drupal 8" \
       io.openshift.s2i.scripts-url="image:///usr/libexec/s2i" \
       io.openshift.expose-services="8080:http" \
-      io.openshift.tags="builder, Nginx, php-fpm, php-7.1"
+      io.openshift.tags="builder, Nginx, php-fpm, php-7.1, Drupal 8"
 
 RUN apt-get update && apt-get install -y nginx \
     && apt-get install -y locales \
@@ -23,8 +22,7 @@ RUN apt-get update && apt-get install -y nginx \
     && apt-get -y install software-properties-common python-software-properties \
     && add-apt-repository -y ppa:ondrej/php && apt-get update \
     && apt-get -y install php7.1 php7.1-fpm php7.1-cli php7.1-common php7.1-curl \
-    php7.1-mbstring php7.1-soap php7.1-xml php7.1-zip php7.1-memcached php7.1-mysql \
-    php7.1-gd php7.1-opcache php7.1-intl php7.1-pdo-sqlite \
+    php7.1-mbstring php7.1-soap php7.1-xml php7.1-zip php7.1-memcached php7.1-mysql php7.1-gd php7.1-opcache \
     wget libfreetype6-dev libjpeg-dev libpng-dev mysql-client curl gettext unzip git \
     && apt-get -y remove --purge software-properties-common python-software-properties \
     && apt-get -y autoremove && apt-get -y autoclean && apt-get clean && rm -rf /var/lib/apt/lists /tmp/* /var/tmp/*
@@ -36,6 +34,9 @@ COPY ./s2i/bin/ /usr/libexec/s2i
 
 RUN mkdir -p /opt/app-root/etc/nginx && \
     chown -R 1001:0 /opt/app-root/etc/nginx
+
+COPY ./files/nginx.conf /etc/nginx/
+COPY ./files/drupal.template /opt/app-root/etc/nginx
 
 # code permissions
 
@@ -60,7 +61,6 @@ RUN sed -i \
         -e "s/pdo_mysql.default_socket=/ pdo_mysql.default_socket=\/var\/lib\/mysql\/mysql.sock/g" \
         /etc/php/7.1/fpm/php.ini
 
-COPY ./files/symfony-demo /etc/nginx/sites-enabled/default
 
 WORKDIR ${HOME}
 
