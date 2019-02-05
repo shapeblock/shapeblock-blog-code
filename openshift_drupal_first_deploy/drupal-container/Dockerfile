@@ -31,10 +31,16 @@ RUN set -ex; \
     # Clean up
     composer clear-cache;
 
-RUN useradd -u 1001 -r -g 0 -d /code -s /sbin/nologin -c "Default Application User" default \
-    && mkdir -p /code \
-    && chown -R 1001:0 /code && chmod -R g+rwX /code
+RUN mkdir /code
 
-RUN git clone --depth=1 https://github.com/badri/drupal-8-composer.git /code
+RUN useradd -u 1001 -r -g 0 -d /app -s /sbin/nologin -c "Default Application User" default \
+    && mkdir -p /app \
+    && chown -R 1001:0 /app && chmod -R g+rwX /app
 
-WORKDIR /code
+#RUN git clone --depth=1 https://github.com/badri/drupal-8-composer.git /code
+
+COPY index.php /code
+
+USER 1001
+
+WORKDIR /app

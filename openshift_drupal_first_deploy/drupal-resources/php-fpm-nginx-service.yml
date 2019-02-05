@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: php-fpm-nginx
+  labels:
+    app: php-fpm-nginx
+spec:
+  selector:
+    app: php-fpm-nginx
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
