@@ -1,7 +1,7 @@
 FROM php:7.1-fpm
 
 RUN apt-get update \
-    && apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev wget
+    && apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev wget git
 
 RUN  docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ \
      && docker-php-ext-install gd \
@@ -30,5 +30,11 @@ RUN set -ex; \
     \
     # Clean up
     composer clear-cache;
+
+RUN useradd -u 1001 -r -g 0 -d /code -s /sbin/nologin -c "Default Application User" default \
+    && mkdir -p /code \
+    && chown -R 1001:0 /code && chmod -R g+rwX /code
+
+RUN git clone --depth=1 https://github.com/badri/drupal-8-composer.git /code
 
 WORKDIR /code
