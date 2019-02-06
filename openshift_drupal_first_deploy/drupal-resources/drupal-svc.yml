@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: drupal-8
+  labels:
+    app: drupal-8
+spec:
+  selector:
+    app: drupal-8
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP

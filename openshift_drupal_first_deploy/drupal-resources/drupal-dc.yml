@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: drupal-8
+  labels:
+    app: drupal-8
+spec:
+  replicas: 1
+  selector:
+    app: drupal-8
+  template:
+    metadata:
+      labels:
+        app: drupal-8
+    spec:
+      volumes:
+        # Create the shared files volume to be used in both pods
+        - name: app
+          emptyDir: {}
+      containers:
+      - name: php-fpm
+        image: lakshminp/drupal-openshift
+        volumeMounts:
+          - name: app
+            mountPath: /app
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "cp -r /code/. /app"]
+      - name: nginx
+        image: lakshminp/nginx-openshift
+        ports:
+          - name: http
+            containerPort: 8080
+        volumeMounts:
+          - name: app
+            mountPath: /app
+    triggers:
+      - type: ConfigChange
+      - type: ImageChange
+        imageChangeParams:
+          automatic: true
+          containerNames:
+            - php-fpm
+          from:
+            kind: "ImageStreamTag"
+            name: "drupal-openshift:latest"
+            namespace: openshift
+      - type: ConfigChange
+      - type: ImageChange
+        imageChangeParams:
+          automatic: true
+          containerNames:
+            - nginx
+          from:
+            kind: "ImageStreamTag"
+            name: "nginx-openshift:latest"
+            namespace: openshift
+      
