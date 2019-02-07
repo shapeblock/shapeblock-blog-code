@@ -22,7 +22,7 @@ spec:
             claimName: drupal-8-files
       containers:
       - name: php-fpm
-        image: lakshminp/drupal-openshift
+        image: 'lakshminp/drupal-openshift:1.0'
         env:
         - name: MYSQL_USER
           valueFrom:
@@ -40,42 +40,48 @@ spec:
           value: "3306"
         - name: MYSQL_DATABASE
           value: drupal8
+        - name: OPENSHIFT_BUILD_NAME
+          value: "1"
         volumeMounts:
           - name: app
             mountPath: /app
           - name: drupal-8-files
-            mountPath: /app/web/sites/default/files
+            mountPath: /shared
         lifecycle:
           postStart:
             exec:
-              command: ["/bin/sh", "-c", "cp -nr /code/. /app"]
+              command:
+                - "/bin/sh"
+                - "-c"
+                - > 
+                  cp -fr /code/. /app;
+                  rm -rf /app/web/sites/default/files;
+                  ln -s /shared /app/web/sites/default/files;
       - name: nginx
-        image: lakshminp/nginx-openshift
+        image: 'lakshminp/nginx-openshift:1.0'
         ports:
           - name: http
             containerPort: 8080
         volumeMounts:
           - name: app
             mountPath: /app
-    triggers:
-      - type: ConfigChange
-      - type: ImageChange
-        imageChangeParams:
-          automatic: true
-          containerNames:
-            - php-fpm
-          from:
-            kind: "ImageStreamTag"
-            name: "drupal-openshift:latest"
-            namespace: openshift
-      - type: ConfigChange
-      - type: ImageChange
-        imageChangeParams:
-          automatic: true
-          containerNames:
-            - nginx
-          from:
-            kind: "ImageStreamTag"
-            name: "nginx-openshift:latest"
-            namespace: openshift
-      
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+          - php-fpm
+        from:
+          kind: "ImageStreamTag"
+          name: "drupal-openshift:latest"
+          namespace: openshift
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+          - nginx
+        from:
+          kind: "ImageStreamTag"
+          name: "nginx-openshift:latest"
+          namespace: openshift
