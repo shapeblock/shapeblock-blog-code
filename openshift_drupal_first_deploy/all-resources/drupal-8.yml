@@ -1,0 +1,239 @@
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: drupal-8
+  labels:
+    app: drupal-8
+spec:
+  replicas: 1
+  selector:
+    app: drupal-8
+  template:
+    metadata:
+      labels:
+        app: drupal-8
+    spec:
+      volumes:
+        # Create the shared files volume to be used in both pods
+        - name: app
+          emptyDir: {}
+        - name: drupal-8-files
+          persistentVolumeClaim:
+            claimName: drupal-8-files
+      containers:
+      - name: php-fpm
+        image: 'lakshminp/drupal-openshift:1.0'
+        env:
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              key: database-user
+              name: drupal-8
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: database-password
+              name: drupal-8
+        - name: MYSQL_HOST
+          value: drupal-8-db
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_DATABASE
+          value: drupal8
+        - name: OPENSHIFT_BUILD_NAME
+          value: "1"
+        volumeMounts:
+          - name: app
+            mountPath: /app
+          - name: drupal-8-files
+            mountPath: /shared
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - > 
+                  cp -fr /code/. /app;
+                  rm -rf /app/web/sites/default/files;
+                  ln -s /shared /app/web/sites/default/files;
+      - name: nginx
+        image: 'lakshminp/nginx-openshift:1.0'
+        ports:
+          - name: http
+            containerPort: 8080
+        volumeMounts:
+          - name: app
+            mountPath: /app
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+          - php-fpm
+        from:
+          kind: "ImageStreamTag"
+          name: "drupal-openshift:latest"
+          namespace: openshift
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+          - nginx
+        from:
+          kind: "ImageStreamTag"
+          name: "nginx-openshift:latest"
+          namespace: openshift
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: drupal-8-files
+  labels:
+    app: drupal-8  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: drupal-8
+  labels:
+    app: drupal-8
+spec:
+  selector:
+    app: drupal-8
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: drupal-8
+  labels:
+    app: drupal-8
+stringData:
+  database-user: drupal8
+  database-password: eSoiDenThicO
+  database-root-password: nKatIcTRIToR
+---
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: drupal-8-db
+  labels:
+    app: drupal-8  
+spec:
+  replicas: 1
+  selector:
+    name: drupal-8-db
+    app: drupal-8    
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        name: drupal-8-db
+        app: drupal-8  
+    spec:
+      containers:
+      - env:
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              key: database-user
+              name: drupal-8
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: database-password
+              name: drupal-8
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: database-root-password
+              name: drupal-8
+        - name: MYSQL_DATABASE
+          value: drupal8
+        image: ' '
+        livenessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 3306
+          timeoutSeconds: 1
+        name: mariadb
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -i
+            - -c
+            - MYSQL_PWD="$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u $MYSQL_USER -D $MYSQL_DATABASE
+              -e 'SELECT 1'
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/lib/mysql/data
+          name: drupal-8-db-data
+      volumes:
+      - name: drupal-8-db-data
+        persistentVolumeClaim:
+          claimName: drupal-8-db
+  triggers:
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - mariadb
+      from:
+        kind: ImageStreamTag
+        name: mariadb:10.2
+        namespace: openshift
+    type: ImageChange
+  - type: ConfigChange
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drupal-8-db
+  labels:
+    app: drupal-8  
+spec:
+  ports:
+  - name: mariadb
+    port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    name: drupal-8-db
+    app: drupal-8  
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: drupal-8-db
+  labels:
+    app: drupal-8  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

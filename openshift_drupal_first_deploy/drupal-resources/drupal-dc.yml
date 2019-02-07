@@ -17,16 +17,38 @@ spec:
         # Create the shared files volume to be used in both pods
         - name: app
           emptyDir: {}
+        - name: drupal-8-files
+          persistentVolumeClaim:
+            claimName: drupal-8-files
       containers:
       - name: php-fpm
         image: lakshminp/drupal-openshift
+        env:
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              key: database-user
+              name: drupal-8
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: database-password
+              name: drupal-8
+        - name: MYSQL_HOST
+          value: drupal-8-db
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_DATABASE
+          value: drupal8
         volumeMounts:
           - name: app
             mountPath: /app
+          - name: drupal-8-files
+            mountPath: /app/web/sites/default/files
         lifecycle:
           postStart:
             exec:
-              command: ["/bin/sh", "-c", "cp -r /code/. /app"]
+              command: ["/bin/sh", "-c", "cp -nr /code/. /app"]
       - name: nginx
         image: lakshminp/nginx-openshift
         ports:

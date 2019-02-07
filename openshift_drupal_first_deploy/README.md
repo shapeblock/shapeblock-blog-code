@@ -1,6 +1,40 @@
-## Build a basic Drupal image
+## Build Drupal image
+
+### Base Drupal image
+
+$ cd drupal-base-image
+
+$ docker build -t lakshminp/drupal-openshift-base:1.0 .
+
+$ docker push lakshminp/drupal-openshift-base:1.0
+
+### Inject source code
+
+$ cd drupal-container
+
+Feel free to add your source code here. Change settings.php, assumption: docroot is /web.
+
+$ docker build -t lakshminp/drupal-openshift:1.0 .
+
+$ docker push lakshminp/drupal-openshift:1.0
+
 
 ## Build a basic Nginx image
+
+$ cd nginx-container
+
+$ docker build -t lakshminp/nginx-openshift:1.0 .
+
+$ docker push lakshminp/nginx-openshift:1.0
+
+## Inject images to OpenShift registry
+
+$ oc import-image drupal-openshift:1.0 --from=lakshminp/drupal-openshift:1.0 --confirm
+$ oc import-image openshift/nginx-openshift:1.0 --from=lakshminp/nginx-openshift:1.0 --confirm
+
+$ oc tag drupal-openshift:1.0 drupal-openshift:latest
+
+$ oc tag nginx-openshift:1.0 nginx-openshift:latest
 
 ## Deploy a MariaDB service
 
@@ -10,10 +44,4 @@
   * volume claim
   * deployment
 
-## Creating an s2i image
-
-## Deploying using s2i
-
-## Creating a template
-
-## Deploying using a template
+## Create and expose a route
