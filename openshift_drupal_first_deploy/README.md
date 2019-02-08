@@ -1,5 +1,13 @@
 ## Build Drupal image
 
+## Build a basic Nginx image
+
+$ cd nginx-container
+
+$ docker build -t lakshminp/nginx-openshift:1.0 .
+
+$ docker push lakshminp/nginx-openshift:1.0
+
 ### Base Drupal image
 
 $ cd drupal-base-image
@@ -19,13 +27,23 @@ $ docker build -t lakshminp/drupal-openshift:1.0 .
 $ docker push lakshminp/drupal-openshift:1.0
 
 
-## Build a basic Nginx image
 
-$ cd nginx-container
+## Using Minishift
 
-$ docker build -t lakshminp/nginx-openshift:1.0 .
+Make sure your Minishift cluster is up.
 
-$ docker push lakshminp/nginx-openshift:1.0
+$ minishift status
+
+Bring it up if it's down.
+
+$ minishift up
+
+Login to your Minishift cluster if you haven't already.
+
+$ minishift ip
+
+$ oc login <minishift-ip>:8443 -u system:admin
+
 
 ## Inject images to OpenShift registry
 
@@ -40,6 +58,8 @@ $ oc tag nginx-openshift:1.0 nginx-openshift:latest
 ## Deploy a MariaDB service
 
 $ oc apply -f db-secrets.yml
+
+$ oc apply -f mariadb-pvc.yml
 
 $ oc apply -f mariadb-dc.yml
 
@@ -62,6 +82,7 @@ $ oc expose svc/drupal-8
 
 ### Change source code
 
+$ git clone git@github.com:badri/drupal-8-composer.git
 $ composer require drupal/token
 $ git commit -a -m "Add token module"
 $ git push origin master
@@ -72,7 +93,6 @@ $ git push origin master
 $ cd drupal-container
 
 $ docker build -t lakshminp/drupal-openshift:1.1 .
-
 $ docker push lakshminp/drupal-openshift:1.1
 
 Import new image into our internal registry.
