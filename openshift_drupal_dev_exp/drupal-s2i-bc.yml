@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: BuildConfig
+metadata:
+  name: drupal-8-s2i-bc
+  labels:
+    app: drupal-8  
+spec:
+  source:
+    git:
+      uri: https://github.com/badri/drupal-8-composer/
+    type: Git
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "drupal-openshift:latest"
+      namespace: openshift
+  strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: drupal-openshift-s2i:v1.0
+          namespace: openshift
+        incremental: true
+      type: Source
+  triggers:
+  - github:
+      secret: "xuqEEupGL5RQfZnlkgLieMluPvyaOKuQWBzcg3Rq"
+    type: GitHub

@@ -1,0 +1,353 @@
+kind: Template
+apiVersion: v1
+message: |-
+  The following service(s) have been created in your project: Drupal 8, MariaDB.
+
+  For more information about using this template, including OpenShift considerations, see https://github.com/badri/ubuntu-drupal-8-s2i/blob/master/README.md.
+metadata:
+  name: drupal-8
+  annotations:
+    description: An example PHP 7.1 application running on Ubuntu with a MySQL database, built for Drupal 8. For more information
+      about using this template, including OpenShift considerations, see https://github.com/badri/ubuntu-drupal-8-s2i/blob/master/README.md..
+    iconClass: icon-drupal
+    openshift.io/display-name: Drupal 8
+    openshift.io/documentation-url: https://www.craftofcoding.com/drupal-on-openshift-enhancing-the-developer-experience
+    openshift.io/long-description: This template defines resources needed to develop a Debian based Drupal 8 setup running on PHP 7.1 using FPM and Nginx. It also includes resources required to create a MariaDB instance.
+    openshift.io/provider-display-name: Lakshmi Narasimhan
+    openshift.io/support-url: https://www.craftofcoding.com
+    tags: quickstart,php,drupal 8
+    template.openshift.io/bindable: "false"
+labels:
+  template: drupal-8
+  app: ${NAME}
+objects:
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${NAME}
+  spec:
+    replicas: 1
+    selector:
+      app: ${NAME}
+    template:
+      metadata:
+        labels:
+          app: ${NAME}
+      spec:
+        volumes:
+          # Create the shared files volume to be used in both pods
+          - name: app
+            emptyDir: {}
+          - name: ${NAME}-files
+            persistentVolumeClaim:
+              claimName: ${NAME}-files
+        containers:
+        - name: php-fpm
+          image: ' '
+          env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${NAME}-db-secret
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${NAME}-db-secret
+          - name: MYSQL_HOST
+            value: ${NAME}-db
+          - name: MYSQL_PORT
+            value: "3306"
+          - name: MYSQL_DATABASE
+            value: ${MYSQL_DATABASE}
+          resources:
+            limits:
+              memory: ${APP_MEMORY_LIMIT}
+          volumeMounts:
+            - name: app
+              mountPath: /app
+            - name: ${NAME}-files
+              mountPath: /shared
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-c"
+                  - > 
+                    cp -fr /code/. /app;
+                    rm -rf /app/web/sites/default/files;
+                    ln -s /shared /app/web/sites/default/files;
+        - name: nginx
+          image: ' '
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            limits:
+              memory: ${APP_MEMORY_LIMIT}
+          volumeMounts:
+            - name: app
+              mountPath: /app
+    triggers:
+      - type: ConfigChange
+      - type: ImageChange
+        imageChangeParams:
+          automatic: true
+          containerNames:
+            - php-fpm
+          from:
+            kind: "ImageStreamTag"
+            name: ${NAME}:latest
+            namespace: ${NAMESPACE}
+      - type: ImageChange
+        imageChangeParams:
+          automatic: true
+          containerNames:
+            - nginx
+          from:
+            kind: "ImageStreamTag"
+            name: "nginx-openshift:latest"
+            namespace: ${NAMESPACE}
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${NAME}-files
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${FILES_VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${NAME}
+  spec:
+    selector:
+      app: ${NAME}
+    ports:
+      - name: http
+        port: 8080
+        protocol: TCP
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ${NAME}-db-secret
+  stringData:
+    database-user: ${MYSQL_USER}
+    database-password: ${MYSQL_PASSWORD}
+    database-root-password: ${MYSQL_ROOT_PASSWORD}
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${NAME}-db
+  spec:
+    replicas: 1
+    selector:
+      name: ${NAME}-db
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          name: ${NAME}-db
+      spec:
+        containers:
+        - env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${NAME}-db-secret
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${NAME}-db-secret
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-root-password
+                name: ${NAME}-db-secret
+          - name: MYSQL_DATABASE
+            value: ${MYSQL_DATABASE}
+          image: ' '
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 3306
+            timeoutSeconds: 1
+          name: mariadb
+          ports:
+          - containerPort: 3306
+            protocol: TCP
+          resources:
+            limits:
+              memory: ${DB_MEMORY_LIMIT}
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -i
+              - -c
+              - MYSQL_PWD="$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u $MYSQL_USER -D $MYSQL_DATABASE
+                -e 'SELECT 1'
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/lib/mysql/data
+            name: ${NAME}-db-data
+        volumes:
+        - name: ${NAME}-db-data
+          persistentVolumeClaim:
+            claimName: ${NAME}-db
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - mariadb
+        from:
+          kind: ImageStreamTag
+          name: mariadb:10.2
+          namespace: openshift
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${NAME}-db
+  spec:
+    ports:
+    - name: mariadb
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+    selector:
+      name: ${NAME}-db
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${NAME}-db
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${DB_VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: ${NAME}
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: ${NAME}
+  spec:
+    source:
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${NAME}:latest
+    strategy:
+        sourceStrategy:
+          from:
+            kind: ImageStreamTag
+            name: drupal-openshift-s2i:v1.0
+            namespace: ${NAMESPACE}
+          incremental: true
+        type: Source
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: ${NAME}
+  spec:
+    host: ${APPLICATION_DOMAIN}
+    to:
+      kind: Service
+      name: ${NAME}
+parameters:
+- description: The name assigned to all of the frontend objects defined in this template.
+  displayName: Name
+  name: NAME
+  required: true
+  from: 'drupal-8-[a-f0-9]{6}'
+  generate: expression
+- description: The OpenShift Namespace where the ImageStream resides.
+  displayName: Namespace
+  name: NAMESPACE
+  required: true
+  value: openshift
+- description: Maximum amount of memory the App container can use.
+  displayName: Memory Limit
+  name: APP_MEMORY_LIMIT
+  required: true
+  value: 512Mi
+- description: Maximum amount of memory the MariaDB container can use.
+  displayName: Memory Limit (MySQL)
+  name: DB_MEMORY_LIMIT
+  required: true
+  value: 1Gi
+- description: Volume space available for DB data, e.g. 512Mi, 2Gi
+  displayName: Volume Capacity
+  name: DB_VOLUME_CAPACITY
+  required: true
+  value: 1Gi
+- description: Volume space available for sites/default/files, e.g. 512Mi, 2Gi
+  displayName: Files Volume Capacity
+  name: FILES_VOLUME_CAPACITY
+  required: true
+  value: 1Gi
+- description: The URL of the repository with your application source code.
+  displayName: Git Repository URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/badri/drupal-8-composer
+- description: Set this to a branch name, tag or other ref of your repository if you
+    are not using the default branch.
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+- description: The exposed hostname that will route to the LEMP service, if left
+    blank a value will be defaulted.
+  displayName: Application Hostname
+  name: APPLICATION_DOMAIN
+- description: Github trigger secret.  A difficult to guess string encoded as part
+    of the webhook URL.  Not encrypted.
+  displayName: GitHub Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+- displayName: Database Name
+  name: MYSQL_DATABASE
+  required: true
+  value: drupal8
+- displayName: Database User
+  name: MYSQL_USER
+  required: true
+  value: drupal8
+- name: MYSQL_ROOT_PASSWORD
+  displayName: MySQL root user Password
+  description: Password for the MySQL root user.
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+- displayName: Database Password
+  from: '[a-zA-Z0-9]{16}'
+  generate: expression
+  name: MYSQL_PASSWORD

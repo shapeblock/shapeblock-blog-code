@@ -1,0 +1,25 @@
+#!/bin/bash -e
+if [[ "$1" == "-h" ]]; then
+    exec /usr/libexec/s2i/usage
+fi
+
+# Restore artifacts from the previous build (if they exist).
+if [ "$(ls /tmp/artifacts/ 2>/dev/null)" ]; then
+  echo "---> Restoring build artifacts..."
+  mv /tmp/artifacts/* /code/
+fi
+
+# Copy over cloned source code.
+echo "---> Installing application source..."
+cp -Rf /tmp/src/. /code/
+
+echo "---> Building application from source..."
+
+pushd /code
+if [ -f composer.json ]; then
+    echo "---> Installing composer dependencies..."
+    composer install --no-dev --prefer-dist --no-interaction --no-ansi --optimize-autoloader
+    # Remove all .git directories to save space.
+    find . -name .git -type d -exec rm -rf {} +
+fi
+popd

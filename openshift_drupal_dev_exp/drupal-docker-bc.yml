@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: BuildConfig
+metadata:
+  name: drupal-8-docker-bc
+  labels:
+    app: drupal-8  
+spec:
+  source:
+    git:
+      uri: https://github.com/badri/drupal-8-composer/
+    type: Git
+    contextDir: .
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "drupal-openshift:latest"
+      namespace: openshift
+  strategy:
+    dockerStrategy:
+      dockerfilePath: deploy/Dockerfile
+  triggers:
+  - type: ImageChange

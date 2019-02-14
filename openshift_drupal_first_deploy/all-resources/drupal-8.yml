@@ -99,8 +99,8 @@ spec:
     requests:
       storage: 1Gi
 ---
-kind: Service
 apiVersion: v1
+kind: Service
 metadata:
   name: drupal-8
   labels:
@@ -113,8 +113,8 @@ spec:
       port: 8080
       protocol: TCP
 ---
-kind: Secret
 apiVersion: v1
+kind: Secret
 metadata:
   name: drupal-8
   labels:
