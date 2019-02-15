@@ -2,7 +2,7 @@
 
 ### Docker based build config
 
-Add deploy/Dockerfile and checkin.
+Add deploy/Dockerfile to your Drupal codebase and checkin.
 
 Create a docker strategy based build config.
 
@@ -21,9 +21,6 @@ Check logs.
 ```
 $ oc logs bc/drupal-8-docker-bc
 ```
-
-
-#### Docker based build config from private repo
 
 
 ### s2i based build
@@ -113,6 +110,7 @@ verify new deployment.
 
 Testing incremental builds.
 
+Customizing/overriding s2i scripts.
 
 NOTE: you can do the same thing using docker build also.
 
@@ -135,6 +133,13 @@ make sure the s2i image is in your namespace.
 ```
 $ oc import-image lakshminp/drupal-openshift-s2i:v1.0 --confirm
 ```
+
+make sure the nginx image is in your namespace.
+
+```
+$ oc tag openshift/nginx-openshift:1.0 nginx-openshift:latest -n drupal
+```
+
 Dry run.
 
 ```
@@ -150,10 +155,8 @@ $ oc process -f drupal-8-template.yml -p NAMESPACE=drupal | oc apply -f -
 Start a deploy.
 
 ```
-$ oc start-build drupal-8-7c36d6-bc
+$ oc start-build drupal-8-7c36d6
 ```
-
-
 
 ### Upload template to UI
 
