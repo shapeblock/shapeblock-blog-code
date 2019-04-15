@@ -11,10 +11,10 @@ metadata:
       about using this template, including OpenShift considerations, see https://github.com/badri/ubuntu-drupal-8-s2i/blob/master/README.md..
     iconClass: icon-drupal
     openshift.io/display-name: Drupal 8
-    openshift.io/documentation-url: https://www.craftofcoding.com/drupal-on-openshift-enhancing-the-developer-experience
+    openshift.io/documentation-url: https://www.shapeblock.com/drupal-on-openshift-enhancing-the-developer-experience
     openshift.io/long-description: This template defines resources needed to develop a Debian based Drupal 8 setup running on PHP 7.1 using FPM and Nginx. It also includes resources required to create a MariaDB instance.
     openshift.io/provider-display-name: Lakshmi Narasimhan
-    openshift.io/support-url: https://www.craftofcoding.com
+    openshift.io/support-url: https://www.shapeblock.com
     tags: quickstart,php,drupal 8
     template.openshift.io/bindable: "false"
 labels:

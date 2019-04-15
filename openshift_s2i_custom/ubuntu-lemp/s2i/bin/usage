@@ -1,6 +1,6 @@
 #!/bin/bash -e
 cat <<EOF
-This is the Ubuntu LEMP S2I image from the craftofcoding.com blog:
+This is the Ubuntu LEMP S2I image from the shapeblock.com blog:
 To use it, install S2I: https://github.com/openshift/source-to-image
 
 Sample invocation:

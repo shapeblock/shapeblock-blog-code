@@ -1,6 +1,6 @@
 FROM php:7.1-fpm
 
-LABEL maintainer="Lakshmi Narasimhan <lakshmi@craftofcoding.com>"
+LABEL maintainer="Lakshmi Narasimhan <lakshmi@shapeblock.com>"
 
 LABEL io.k8s.description="Base image for Drupal 8" \
       io.k8s.display-name="OpenShift Drupal 8" \

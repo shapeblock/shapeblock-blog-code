@@ -1,6 +1,6 @@
 FROM ubuntu:16.04
 
-LABEL maintainer="Lakshmi Narasimhan <lakshmi@lakshminp.com>"
+LABEL maintainer="Lakshmi Narasimhan <lakshmi@shapeblock.com>"
 
 ENV UBUNTU_RELEASE=xenial \
     LANG=en_US.UTF-8 \
