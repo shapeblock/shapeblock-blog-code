@@ -1,0 +1,330 @@
+kind: Template
+apiVersion: v1
+message: |-
+  The following service(s) have been created in your project: Wordpress, MySQL.
+metadata:
+  name: wordpress
+  annotations:
+    description: An example Wordpress setup with MySQL DB running on PHP 7.1.
+    iconClass: icon-wordpress
+    openshift.io/display-name: Wordpress
+    openshift.io/documentation-url: https://www.shapeblock.com/docs/wordpress
+    openshift.io/long-description: This template defines resources needed to develop a Wordpress site with MySQL DB on PHP 7.1.
+    openshift.io/provider-display-name: ShapeBlock
+    openshift.io/support-url: https://www.shapeblock.com
+    tags: quickstart,wordpress
+    template.openshift.io/bindable: "false"
+labels:
+  template: wordpress
+  app: ${NAME}
+objects:
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${NAME}
+  spec:
+    replicas: 1
+    selector:
+      app: ${NAME}
+    template:
+      metadata:
+        labels:
+          app: ${NAME}
+      spec:
+        volumes:
+          # Create the shared files volume to be used in both pods
+          - name: app
+            emptyDir: {}
+          - name: ${NAME}-files
+            persistentVolumeClaim:
+              claimName: ${NAME}-files
+        containers:
+        - name: ${NAME}
+          image: ' '
+          env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: MYSQL_USER
+                name: ${NAME}
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MYSQL_PASSWORD
+                name: ${NAME}
+          - name: MYSQL_HOST
+            value: ${NAME}-db
+          - name: MYSQL_PORT
+            value: "3306"
+          - name: MYSQL_DATABASE
+            value: ${MYSQL_DATABASE}
+          resources:
+            limits:
+              memory: ${APP_MEMORY_LIMIT}
+          volumeMounts:
+            - name: ${NAME}-files
+              mountPath: /shared
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-c"
+                  - > 
+                    ln -s /shared /opt/app-root/src/wp-content/uploads;
+    triggers:
+      - type: ConfigChange
+      - type: ImageChange
+        imageChangeParams:
+          automatic: true
+          containerNames:
+            - ${NAME}
+          from:
+            kind: "ImageStreamTag"
+            name: ${NAME}:latest
+            namespace: ${NAMESPACE}
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${NAME}-files
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${FILES_VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${NAME}
+  spec:
+    selector:
+      app: ${NAME}
+    ports:
+      - name: http
+        port: 8080
+        protocol: TCP
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ${NAME}
+  stringData:
+    MYSQL_USER: ${MYSQL_USER}
+    MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${NAME}-db
+  spec:
+    replicas: 1
+    selector:
+      name: ${NAME}-db
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          name: ${NAME}-db
+      spec:
+        containers:
+        - env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: MYSQL_USER
+                name: ${NAME}
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MYSQL_PASSWORD
+                name: ${NAME}
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MYSQL_ROOT_PASSWORD
+                name: ${NAME}
+          - name: MYSQL_DATABASE
+            value: ${MYSQL_DATABASE}
+          image: ' '
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 3306
+            timeoutSeconds: 1
+          name: mysql
+          ports:
+          - containerPort: 3306
+            protocol: TCP
+          resources:
+            limits:
+              memory: ${DB_MEMORY_LIMIT}
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -i
+              - -c
+              - MYSQL_PWD="$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u $MYSQL_USER -D $MYSQL_DATABASE
+                -e 'SELECT 1'
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/lib/mysql/data
+            name: ${NAME}-db-data
+        volumes:
+        - name: ${NAME}-db-data
+          persistentVolumeClaim:
+            claimName: ${NAME}-db
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - mysql
+        from:
+          kind: ImageStreamTag
+          name: mysql:5.7
+          namespace: openshift
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${NAME}-db
+  spec:
+    ports:
+    - name: mysql
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+    selector:
+      name: ${NAME}-db
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${NAME}-db
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${DB_VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: ${NAME}
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: ${NAME}
+  spec:
+    source:
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${NAME}:latest
+    strategy:
+        sourceStrategy:
+          from:
+            kind: ImageStreamTag
+            name: php:7.1
+            namespace: openshift
+          incremental: true
+        type: Source
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: ${NAME}
+    annotations:
+      kubernetes.io/tls-acme: "true"
+  spec:
+    host: ${APPLICATION_DOMAIN}
+    to:
+      kind: Service
+      name: ${NAME}
+    tls:
+      termination: edge
+parameters:
+- description: The name assigned to all of the frontend objects defined in this template.
+  displayName: Name
+  name: NAME
+  required: true
+  from: 'wordpress-[a-f0-9]{6}'
+  generate: expression
+- description: The OpenShift Namespace where the ImageStream resides.
+  displayName: Namespace
+  name: NAMESPACE
+  required: true
+  value: openshift
+- description: Maximum amount of memory the App container can use.
+  displayName: Memory Limit
+  name: APP_MEMORY_LIMIT
+  required: true
+  value: 512Mi
+- description: Maximum amount of memory the MySQL container can use.
+  displayName: Memory Limit (MySQL)
+  name: DB_MEMORY_LIMIT
+  required: true
+  value: 1Gi
+- description: Volume space available for DB data, e.g. 512Mi, 2Gi
+  displayName: Volume Capacity
+  name: DB_VOLUME_CAPACITY
+  required: true
+  value: 1Gi
+- description: Volume space available for sites/default/files, e.g. 512Mi, 2Gi
+  displayName: Files Volume Capacity
+  name: FILES_VOLUME_CAPACITY
+  required: true
+  value: 1Gi
+- description: The URL of the repository with your application source code.
+  displayName: Git Repository URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/wordpress/wordpress
+- description: Set this to a branch name, tag or other ref of your repository if you
+    are not using the default branch.
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+- description: The exposed hostname that will route to the LEMP service, if left
+    blank a value will be defaulted.
+  displayName: Application Hostname
+  name: APPLICATION_DOMAIN
+- description: Github trigger secret.  A difficult to guess string encoded as part
+    of the webhook URL.  Not encrypted.
+  displayName: GitHub Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+- displayName: Database Name
+  name: MYSQL_DATABASE
+  required: true
+  value: wordpress
+- displayName: Database User
+  name: MYSQL_USER
+  required: true
+  value: wordpress
+- name: MYSQL_ROOT_PASSWORD
+  displayName: MySQL root user Password
+  description: Password for the MySQL root user.
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+- displayName: Database Password
+  from: '[a-zA-Z0-9]{16}'
+  generate: expression
+  name: MYSQL_PASSWORD
