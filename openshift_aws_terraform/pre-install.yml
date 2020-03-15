@@ -1,0 +1,44 @@
+---
+- hosts: all
+  tasks:
+  - name: install required packages
+    yum:
+      name: ['wget', 'git', 'net-tools', 'bind-utils', 'yum-utils', 'firewalld', 'bridge-utils', 'bash-completion', 'kexec-tools', 'sos', 'psacct', 
+'NetworkManager']
+      state: installed
+
+  - name: remove domain from resolv.conf
+    lineinfile:
+      path: /etc/resolv.conf
+      regexp: "^search .*"
+      state: absent
+
+  - name: disable dns managed by NetworkManager
+    ini_file:
+      path: /etc/NetworkManager/NetworkManager.conf
+      section: main
+      option: dns
+      value: none
+    register: nmconf
+
+  - name: restart NetworkManager
+    service:
+      name: NetworkManager
+      state: restarted
+    when: nmconf.changed
+
+  - name: generate /etc/hosts
+    lineinfile:
+      dest: "/etc/hosts"
+      regexp: ".*{{ hostvars[item].inventory_hostname }}$"
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} {{ hostvars[item].ansible_hostname }} {{ hostvars[item].inventory_hostname }}"
+      state: present
+    with_items: "{{ play_hosts }}"
+
+  - name: disable swappiness
+    sysctl:
+      name: vm.swappiness
+      value: 0
+      sysctl_set: yes
+      state: present
+      reload: yes

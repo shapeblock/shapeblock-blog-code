@@ -19,3 +19,15 @@ module "openshift_aws" {
   infra_size   = var.infra_size
   tld          = var.tld
 }
+
+output "bastion_ip_address" {
+  value = "${module.openshift_aws.bastion_ip_address}"
+}
+
+output "master_domain" {
+  value = "${module.openshift_aws.master_domain}"
+}
+
+output "admin_password" {
+  value = "${module.openshift_aws.admin_password}"
+}
